@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no"
+  >
+
+  <title>MR Creeper</title>
+
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      touch-action: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<a-scene
+  id="scene"
+  mindar-image="imageTargetSrc: ./assets/targets.mind;"
+  color-space="sRGB"
+  renderer="colorManagement: true; physicallyCorrectLights: true"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false"
+>
+
+  <a-assets>
+    <a-asset-item
+      id="creeperModel"
+      src="./assets/creeper.glb">
+    </a-asset-item>
+  </a-assets>
+
+  <a-camera
+    id="camera"
+    position="0 0 0"
+    look-controls="enabled: false">
+  </a-camera>
+
+  <a-entity
+    mindar-image-target="targetIndex: 0">
+
+    <a-gltf-model
+      id="creeper"
+      src="#creeperModel"
+      position="0 0 0"
+      rotation="0 180 0"
+      scale="0.05 0.05 0.05">
+    </a-gltf-model>
+
+  </a-entity>
+
+</a-scene>
+
+
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+
+  const scene = document.querySelector("#scene");
+  const creeper = document.querySelector("#creeper");
+  const cameraEl = document.querySelector("#camera");
+
+  let active = false;
+  let originalMaterials = [];
+
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+
+
+  // Чекаємо завантаження моделі
+  creeper.addEventListener("model-loaded", () => {
+
+    const model = creeper.getObject3D("mesh");
+
+    model.traverse((node) => {
+
+      if (node.isMesh) {
+
+        originalMaterials.push({
+          mesh: node,
+          material: node.material.clone()
+        });
+
+      }
+
+    });
+
+    console.log("Creeper loaded");
+  });
+
+
+  scene.addEventListener("loaded", () => {
+
+    const canvas = scene.canvas;
+
+
+    function pressCreeper(event) {
+
+      event.preventDefault();
+
+      const rect =
+        canvas.getBoundingClientRect();
+
+      let clientX;
+      let clientY;
+
+
+      // Телефон
+      if (event.touches && event.touches.length > 0) {
+
+        clientX = event.touches[0].clientX;
+        clientY = event.touches[0].clientY;
+
+      }
+
+      // Мишка
+      else {
+
+        clientX = event.clientX;
+        clientY = event.clientY;
+
+      }
+
+
+      // Перетворюємо координати натискання
+      pointer.x =
+        ((clientX - rect.left) / rect.width) * 2 - 1;
+
+      pointer.y =
+        -((clientY - rect.top) / rect.height) * 2 + 1;
+
+
+      const camera =
+        cameraEl.getObject3D("camera");
+
+      const model =
+        creeper.getObject3D("mesh");
+
+      if (!camera || !model) return;
+
+
+      raycaster.setFromCamera(
+        pointer,
+        camera
+      );
+
+
+      // Перевіряємо ВСІ частини GLB
+      const intersections =
+        raycaster.intersectObject(
+          model,
+          true
+        );
+
+
+      if (intersections.length > 0) {
+
+        console.log("CREEPER PRESSED!");
+
+        activateCreeper(model);
+      }
+    }
+
+
+    // МИШКА
+    canvas.addEventListener(
+      "click",
+      pressCreeper
+    );
+
+
+    // ТЕЛЕФОН
+    canvas.addEventListener(
+      "touchstart",
+      pressCreeper,
+      { passive: false }
+    );
+
+  });
+
+
+  function activateCreeper(model) {
+
+    active = !active;
+
+
+    if (active) {
+
+      /* ЧЕРВОНИЙ */
+
+      model.traverse((node) => {
+
+        if (node.isMesh) {
+
+          node.material =
+            node.material.clone();
+
+          node.material.color.set(
+            "#ff2020"
+          );
+
+          node.material.needsUpdate =
+            true;
+        }
+
+      });
+
+
+      /* РУХ */
+
+      creeper.setAttribute(
+        "animation",
+        {
+          property: "position",
+          from: "-0.25 0 0",
+          to: "0.25 0 0",
+          dur: 600,
+          dir: "alternate",
+          loop: true,
+          easing: "easeInOutSine"
+        }
+      );
+
+    }
+
+    else {
+
+      /* ЗУПИНКА */
+
+      creeper.removeAttribute(
+        "animation"
+      );
+
+      creeper.setAttribute(
+        "position",
+        "0 0 0"
+      );
+
+
+      /* ПОВЕРТАЄМО МАТЕРІАЛ */
+
+      originalMaterials.forEach(
+        (item) => {
+
+          item.mesh.material =
+            item.material.clone();
+
+        }
+      );
+
+    }
+
+  }
+
+});
+</script>
+
+</body>
+</html>
